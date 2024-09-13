@@ -1,28 +1,47 @@
 spring:
+  profiles:
+    active: dev
   application:
-    name: user-center
+    name: yupao-backend
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
     password: 123456
-    url: jdbc:mysql:///yupi
-  #session失效时间
-  session:
-    timeout: 86400
+    url: jdbc:mysql:///yupao?serverTimezone=GMT%2B8
+
+  mvc:
+    pathmatch:
+      matching-strategy: ANT_PATH_MATCHER
+  #redis 配置
+  data:
+    redis:
+      port: 6379
+      host: localhost
+      database: 1
 
 server:
   port: 8080
   servlet:
     context-path: /api
+    #session失效时间
+    session:
+      cookie:
+        domain: localhost
+      timeout: 86400
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: false
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
   global-config:
     db-config:
       logic-delete-field: isDelete
       logic-not-delete-value: 0
       logic-delete-value: 1
+  type-aliases-package: com.yupi.yupaoBackend.model
 
-
-
-
+knife4j:
+  enable: true
+  setting:
+    # 开启动态请求参数，true-开启，false-关闭
+    enable-dynamic-parameter: true
