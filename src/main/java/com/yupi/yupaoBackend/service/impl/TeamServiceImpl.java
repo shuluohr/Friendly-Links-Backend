@@ -305,6 +305,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      * @return
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean quitTeam(TeamQuitRequest teamQuitRequest, User loginUser) {
         if (teamQuitRequest == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"传入参数为空");
@@ -363,15 +364,25 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      * @return
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean deleteTeam(long id, User loginUser) {
         // 1. 校验队伍是否存在
         Team team = getTeamById(id);
+        long teamId = team.getId();
         // 2. 校验你是不是队伍的队长
+        if (team.getUserId() != loginUser.getId()){
+            throw new BusinessException(ErrorCode.NO_AUTH, "无访问权限");
+        }
         // 3. 移除所有加入队伍的关联信息
+        LambdaQueryWrapper<UserTeam> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(UserTeam::getTeamId, teamId);
+        boolean result = userTeamService.remove(queryWrapper);
+        if (!result){
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+        }
         // 4. 删除队伍
+        return  removeById(teamId);
 
-
-        return false;
     }
 
     /**
