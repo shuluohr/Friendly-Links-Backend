@@ -1,6 +1,7 @@
 package com.yupi.yupaoBackend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.yupi.yupaoBackend.common.ErrorCode;
 import com.yupi.yupaoBackend.contant.enums.TeamStatusEnum;
@@ -21,7 +22,10 @@ import com.yupi.yupaoBackend.service.UserTeamService;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /**
 * @author 14700
@@ -44,6 +49,9 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private RedissonClient redissonClient;
     /**
      * 创建队伍
      *
@@ -137,6 +145,10 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             if (id != null && id > 0){
                 queryWrapper.eq(Team::getUserId, id);
             }
+            List<Long> idList = teamQuery.getIdList();
+            if (CollectionUtils.isNotEmpty(idList)){
+                queryWrapper.in(Team::getId, idList);
+            }
             String searchText = teamQuery.getSearchText();
             if (StringUtils.isNotBlank(searchText)){
                 queryWrapper.and(qw->qw.like(Team::getName, searchText).or().like(Team::getDescription, searchText));
@@ -166,7 +178,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
                 statusEnum = TeamStatusEnum.PUBLIC;
             }
             //只有管理员才能查看加密还有非公开的房间
-            if (!isAdmin && !statusEnum.equals(TeamStatusEnum.PUBLIC)){
+            if (!isAdmin && statusEnum.equals(TeamStatusEnum.PRIVATE)){
                 throw new BusinessException(ErrorCode.NO_AUTH, "没有权限");
             }
             queryWrapper.eq(Team::getStatus, statusEnum.getStatus());
@@ -222,7 +234,6 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             throw new BusinessException(ErrorCode.NO_AUTH,"无权限");
         }
         //4如果队伍状态改为加密，必须要有密码
-        //todo 如果之前已经是加密房间，不改密码也可以 finish
         TeamStatusEnum newTeamStatus = TeamStatusEnum.getEnumByValue(teamUpdateRequest.getStatus());
         TeamStatusEnum oldTeamStatus = TeamStatusEnum.getEnumByValue(oldTeam.getStatus());
         if (newTeamStatus.equals(TeamStatusEnum.SECRET)){
@@ -269,32 +280,50 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         //该用户已加入的队伍数量
         long userId = loginUser.getId();
-        LambdaQueryWrapper<UserTeam> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(UserTeam::getUserId, userId);
-        long hasJoinNum = userTeamService.count(queryWrapper);
-        if (hasJoinNum > 5){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"最多创建和加入 5 个队伍");
+        //分布式锁解决多服务器多线程多条插入问题
+        RLock lock = redissonClient.getLock("yupao:TeamServiceImpl:joinTeam:lock");
+        try {
+            while (true){
+                if (lock.tryLock(0,-1, TimeUnit.MILLISECONDS)){
+                    LambdaQueryWrapper<UserTeam> queryWrapper = new LambdaQueryWrapper<>();
+                    queryWrapper.eq(UserTeam::getUserId, userId);
+                    long hasJoinNum = userTeamService.count(queryWrapper);
+                    if (hasJoinNum > 5) {
+                        throw new BusinessException(ErrorCode.PARAMS_ERROR, "最多创建和加入 5 个队伍");
+                    }
+                    //不能重复加入已加入的队伍
+                    queryWrapper = new LambdaQueryWrapper<>();
+                    queryWrapper.eq(UserTeam::getUserId, userId);
+                    queryWrapper.eq(UserTeam::getTeamId, teamId);
+                    long hasUserJoinTeamNum = userTeamService.count(queryWrapper);
+                    if (hasUserJoinTeamNum >= 1) {
+                        throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户已加入该队伍");
+                    }
+
+                    //已加入队伍的人数
+                    long teamHasJoinNum = countTeamUserByTeamId(teamId);
+                    if (teamHasJoinNum >= team.getMaxNum()){
+                        throw new BusinessException(ErrorCode.PARAMS_ERROR, "队伍已满");
+                    }
+                    //新增队伍 - 用户关联信息
+                    UserTeam userTeam = new UserTeam();
+                    userTeam.setUserId(userId);
+                    userTeam.setTeamId(teamId);
+                    userTeam.setJoinTime(new Date());
+                    return  userTeamService.save(userTeam);
+
+                }
+            }
+
+        } catch (InterruptedException e) {
+            log.error("doJoinTeamWork error",e);
+            return false;
+        } finally {
+            //只能释放自己的锁
+            if (lock.isHeldByCurrentThread()){
+                lock.unlock();
+            }
         }
-        //不能重复加入已加入的队伍
-        queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(UserTeam::getUserId, userId);
-        queryWrapper.eq(UserTeam::getTeamId, teamId);
-        long hasUserJoinTeamNum = userTeamService.count(queryWrapper);
-        if (hasUserJoinTeamNum >= 1){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"用户已加入该队伍");
-        }
-        //已加入队伍的人数
-        long teamHasJoinNum = countTeamUserByTeamId(teamId);
-        if (teamHasJoinNum >= team.getMaxNum()){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "队伍已满");
-        }
-        //新增队伍 - 用户关联信息
-        UserTeam userTeam = new UserTeam();
-        userTeam.setUserId(userId);
-        userTeam.setTeamId(teamId);
-        userTeam.setJoinTime(new Date());
-        boolean result = userTeamService.save(userTeam);
-        return result;
     }
 
     /**

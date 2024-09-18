@@ -9,7 +9,7 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 用户封装类
+ * 用户封装类（脱敏）
  *
  * @author 陈君哲
  */

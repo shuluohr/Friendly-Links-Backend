@@ -7,14 +7,17 @@ import com.google.gson.reflect.TypeToken;
 import com.yupi.yupaoBackend.common.ErrorCode;
 import com.yupi.yupaoBackend.exception.BusinessException;
 import com.yupi.yupaoBackend.model.domain.User;
+import com.yupi.yupaoBackend.model.vo.UserVO;
 import com.yupi.yupaoBackend.service.UserService;
 
 import com.yupi.yupaoBackend.mapper.UserMapper;
+import com.yupi.yupaoBackend.utils.AlgorithmUtils;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
@@ -277,7 +280,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
         Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
         if (userObj == null){
-            throw  new BusinessException(ErrorCode.NO_AUTH);
+            throw  new BusinessException(ErrorCode.NO_LOGIN);
         }
         return (User) userObj;
     }
@@ -299,6 +302,54 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     public boolean isAdmin(User loginUser){
         //仅管理员可操作
         return loginUser.getUserRole() == ADMIN_ROLE;
+    }
+
+    @Override
+    public List<User> matchUsers(long num, User loginUser) {
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<User>();
+        queryWrapper.select(User::getId,User::getTags);
+        queryWrapper.isNotNull(User::getTags);
+        List<User> userList = list(queryWrapper);
+        String tags = loginUser.getTags();
+        System.out.println("=========="+ tags);
+        Gson gson = new Gson();
+        List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>() {}.getType());
+        //用户列表的下标 => 相似度
+        List<ImmutablePair<User,Long>> list = new ArrayList<>();
+        for (int i = 0; i < userList.size(); i++) {
+            User user = userList.get(i);
+            String userTags = user.getTags();
+            //无标签
+            if (StringUtils.isBlank(userTags) || user.getId() == loginUser.getId()){
+                continue;
+            }
+            List<String> userTagList = gson.fromJson(userTags, new TypeToken<List<String>>(){}.getType());
+            //计算分数
+            long distance = AlgorithmUtils.minDistance(userTagList, tagList);
+            list.add(new ImmutablePair<>(user,distance));
+        }
+        //按编辑距离由小到大排序
+        List<ImmutablePair<User, Long>> toUserPairList = list.stream()
+                .sorted((a, b) -> (int) (a.getValue() - b.getValue()))
+                .limit(num)
+                .collect(Collectors.toList());
+        //从中取出 user 并脱敏
+        List<Long> userIdList = toUserPairList.stream().map(pair -> pair.getKey().getId()).collect(Collectors.toList());
+        LambdaQueryWrapper<User> userQueryWrapper = new LambdaQueryWrapper<>();
+        userQueryWrapper.in(User::getId,userIdList);
+
+        //list  有序   1, 2, 3
+        //因为 QueryWrapper.in 会破坏有序序列，变为无序
+        //通过一个 Map 映射使无序序列变为有序
+        //Map<id, User>
+        Map<Long, List<User>> userIdUserListMap = list(userQueryWrapper).stream().
+                map(user -> getSafetyUser(user)).
+                collect(Collectors.groupingBy(User::getId));
+        ArrayList<User> finalUserList = new ArrayList<>();
+        for (Long userId : userIdList) {
+            finalUserList.add(userIdUserListMap.get(userId).get(0));
+        }
+        return finalUserList;
     }
 
     /**

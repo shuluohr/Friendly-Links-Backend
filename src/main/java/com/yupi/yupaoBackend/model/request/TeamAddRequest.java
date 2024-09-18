@@ -1,5 +1,6 @@
 package com.yupi.yupaoBackend.model.request;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -33,6 +34,7 @@ public class TeamAddRequest implements Serializable {
     /**
      * 过期时间
      */
+    @JsonFormat(locale="zh", timezone="GMT+8", pattern="yyyy-MM-dd")
     private Date expireTime;
 
     /**

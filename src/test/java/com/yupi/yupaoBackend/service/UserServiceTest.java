@@ -116,6 +116,18 @@ class UserServiceTest {
 
     }
 
+    /**
+     * 批量删除
+     */
+    @Test
+    public void deleteUsers() {
+        final Integer Insert_Users_NUM = 100000;
+        List<Long> idList = new ArrayList();
+        for (long i = 8680; i < Insert_Users_NUM; i++) {
+            idList.add(i);
+        }
+        userService.removeBatchByIds(idList);
+    }
 
 
 

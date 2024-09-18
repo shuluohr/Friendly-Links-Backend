@@ -10,6 +10,7 @@ import com.yupi.yupaoBackend.exception.BusinessException;
 import com.yupi.yupaoBackend.model.domain.User;
 import com.yupi.yupaoBackend.model.request.UserLoginRequest;
 import com.yupi.yupaoBackend.model.request.UserRegisterRequest;
+import com.yupi.yupaoBackend.model.vo.UserVO;
 import com.yupi.yupaoBackend.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
@@ -90,7 +91,7 @@ public class userController {
     public BaseResponse<User> getCurrentUser(HttpServletRequest request){
         User currentUser = (User)request.getSession().getAttribute(USER_LOGIN_STATE);
         if (currentUser == null){
-            throw new BusinessException(ErrorCode.NULL_ERROR,"用户状态为空");
+            throw new BusinessException(ErrorCode.NO_LOGIN,"没有登录");
         }
         long userId = currentUser.getId();
         User user = userService.getById(userId);
@@ -179,5 +180,20 @@ public class userController {
     }
 
 
+    /**
+     * 获取最匹配的用户
+     * @param num
+     * @param request
+     * @return
+     */
+    @GetMapping("/match")
+    public BaseResponse<List<User>> matchUsers(long num, HttpServletRequest request){
+        if (num <= 0 || num > 20){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        User loginUser = userService.getLoginUser(request);
+        List<User> result = userService.matchUsers(num, loginUser);
+        return ResultUtils.success(ErrorCode.OK, result);
+    }
 
 }

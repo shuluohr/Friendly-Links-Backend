@@ -1,8 +1,10 @@
 package com.yupi.yupaoBackend.service;
 
+import com.yupi.yupaoBackend.common.BaseResponse;
 import com.yupi.yupaoBackend.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yupi.yupaoBackend.model.request.TeamJoinRequest;
+import com.yupi.yupaoBackend.model.vo.UserVO;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
@@ -85,4 +87,11 @@ public interface UserService extends IService<User> {
 
     boolean isAdmin(User loginUser);
 
+    /**
+     * 获取最匹配的用户
+     * @param num
+     * @param loginUser
+     * @return
+     */
+    List<User> matchUsers(long num, User loginUser);
 }
