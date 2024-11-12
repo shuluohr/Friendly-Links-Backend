@@ -6,7 +6,7 @@ import org.junit.runner.Runner;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-@RunWith(Runner.class)
+//@RunWith(Runner.class)
 class UserCenterJavaApplicationTests {
 
 

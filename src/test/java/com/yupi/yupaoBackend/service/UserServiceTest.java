@@ -2,6 +2,7 @@ package com.yupi.yupaoBackend.service;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import com.yupi.yupaoBackend.mapper.UserMapper;
 import com.yupi.yupaoBackend.model.domain.User;
@@ -130,7 +131,42 @@ class UserServiceTest {
     }
 
 
-
+    @Test
+    public void doConcurrencyInsertUsers() {
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
+        //分十组
+        int j = 0;
+        List<CompletableFuture<Void>> futureList = new ArrayList<>();
+        for (int i = 0; i< 10 ; i++){
+            ArrayList<User> userList = new ArrayList<>();
+            while (true){
+                j++;
+                User user = new User();
+                user.setUsername("假用户");
+                user.setUserAccount("假账户");
+                user.setAvatarUrl("https://tse1-mm.cn.bing.net/th/id/OIP-C.YxR-i4hhHwwQSBt67y1DkgAAAA?w=163&h=180&c=7&r=0&o=5&pid=1.7");
+                user.setGender(1);
+                user.setUserPassword("12345678");
+                user.setPhone("8127383234");
+                user.setEmail("12345678@qq.com");
+                user.setUserRole(0);
+                user.setPlanetCode("11111"+i);
+                user.setTags("[]");
+                userList.add(user);
+                if (j % 100000 == 0) {
+                    break;
+                }
+            }
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                userService.saveBatch(userList, 10000);
+            });
+            futureList.add(future);
+        }
+        CompletableFuture.allOf(futureList.toArray(new CompletableFuture[futureList.size()])).join();
+        stopWatch.stop();
+        System.out.println(stopWatch.getTotalTimeMillis());
+    }
 
     
 }

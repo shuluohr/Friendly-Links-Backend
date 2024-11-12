@@ -20,7 +20,7 @@ spring:
       database: 1
 
 server:
-  port: 8081
+  port: 8080
   servlet:
     context-path: /api
     #session失效时间

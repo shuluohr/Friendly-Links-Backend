@@ -4,8 +4,14 @@ import com.yupi.yupaoBackend.mapper.UserMapper;
 import com.yupi.yupaoBackend.model.domain.User;
 import com.yupi.yupaoBackend.service.UserService;
 import jakarta.annotation.Resource;
+import org.junit.Test;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
+
+import javax.lang.model.type.ArrayType;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @author 陈君哲
@@ -39,7 +45,7 @@ public class InsertUsers {
             user.setEmail("12345678@qq.com");
             user.setUserRole(0);
             user.setPlanetCode("11111"+i);
-            user.setTags("[假]");
+            user.setTags("[]");
             userMapper.insert(user);
 
 
@@ -47,4 +53,6 @@ public class InsertUsers {
         stopWatch.stop();
         System.out.println(stopWatch.prettyPrint());
     }
+
+
 }

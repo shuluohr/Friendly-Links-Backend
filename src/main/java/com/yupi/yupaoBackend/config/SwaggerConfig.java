@@ -17,8 +17,8 @@ public class SwaggerConfig {
     @Bean
     public OpenAPI springShopOpenAPI() {
         return new OpenAPI()
-                .info(new Info().title("心心相印-技术交友平台")
-                        .description("心心相印-技术交友平台的接口文档")
+                .info(new Info().title("友情连接")
+                        .description("友情连接的接口文档")
                         .version("v0.0.1")
                         .license(new License().name("Apache 2.0").url("http://springdoc.org")))
                 .externalDocs(new ExternalDocumentation()
