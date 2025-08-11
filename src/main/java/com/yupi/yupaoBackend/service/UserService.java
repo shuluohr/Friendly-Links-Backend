@@ -94,4 +94,18 @@ public interface UserService extends IService<User> {
      * @return
      */
     List<User> matchUsers(long num, User loginUser);
+
+    /**
+     * 添加好友
+     * @param id
+     * @return
+     */
+    boolean joinFriend(long id,User loginUser);
+
+    /**
+     * 获取我的好友列表
+     * @param loginUser
+     * @return
+     */
+    List<UserVO> getMyJoinFriendList(User loginUser);
 }

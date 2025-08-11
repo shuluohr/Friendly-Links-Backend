@@ -14,10 +14,8 @@ import com.yupi.yupaoBackend.model.vo.UserVO;
 import com.yupi.yupaoBackend.service.UserService;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.naming.EjbRef;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.CollectionUtils;
@@ -28,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.yupi.yupaoBackend.contant.UserConstant.USER_LOGIN_STATE;
-
 /**
  * 用户接口
  *
@@ -37,9 +34,9 @@ import static com.yupi.yupaoBackend.contant.UserConstant.USER_LOGIN_STATE;
 @Slf4j
 @RestController
 @RequestMapping("user")
-@CrossOrigin(allowCredentials = "true",origins = {"http://localhost:5173"},methods={RequestMethod.POST,RequestMethod.GET})
-//@CrossOrigin(origins = {"http://120.26.249.212/api"},methods = {RequestMethod.GET, RequestMethod.POST})
-public class userController {
+@CrossOrigin(allowCredentials = "true",originPatterns={"http://localhost:5173","http://ip:5173","http://ip"},methods={RequestMethod.POST,RequestMethod.GET})
+//@CrossOrigin(allowCredentials = "true",origins = {"http://localhost:5173"},methods={RequestMethod.POST,RequestMethod.GET})
+public class UserController {
 
     @Resource
     private UserService userService;
@@ -194,6 +191,31 @@ public class userController {
         User loginUser = userService.getLoginUser(request);
         List<User> result = userService.matchUsers(num, loginUser);
         return ResultUtils.success(ErrorCode.OK, result);
+    }
+
+    /**
+     * 添加好友
+     * @param id
+     * @return
+     */
+    @PostMapping("/joinFriend")
+    public BaseResponse<Boolean> joinFriend(@RequestBody long id,HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        boolean result = userService.joinFriend(id,loginUser);
+        return ResultUtils.success(ErrorCode.OK, result);
+    }
+
+    /**
+     * 获取我的好友列表
+     *
+     * @param request
+     * @return
+     */
+    @GetMapping("/getMyJoinFriendList")
+    public BaseResponse<List<UserVO>> joinFriend(HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        List<UserVO> myJoinFriendList = userService.getMyJoinFriendList(loginUser);
+        return ResultUtils.success(ErrorCode.OK, myJoinFriendList);
     }
 
 }

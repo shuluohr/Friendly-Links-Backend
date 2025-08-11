@@ -18,6 +18,7 @@ public class ResultUtils {
         return new BaseResponse<>(errorCode.getCode(), data,errorCode.getMsg());
     }
 
+
     /**
      * 失败
      *

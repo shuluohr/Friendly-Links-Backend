@@ -3,6 +3,7 @@ package com.yupi.yupaoBackend.service;
 import com.yupi.yupaoBackend.model.domain.Team;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.yupi.yupaoBackend.model.domain.User;
+import com.yupi.yupaoBackend.model.dto.TeamMemberGetDTO;
 import com.yupi.yupaoBackend.model.dto.TeamQuery;
 import com.yupi.yupaoBackend.model.request.TeamJoinRequest;
 import com.yupi.yupaoBackend.model.request.TeamQuitRequest;
@@ -63,4 +64,11 @@ public interface TeamService extends IService<Team> {
      * @return
      */
     boolean deleteTeam(long id, User loginUser);
+
+    /**
+     * 获取队伍
+     * @param teamMemberGetRequest
+     * @return
+     */
+    List<User> memberList(TeamMemberGetDTO teamMemberGetRequest);
 }

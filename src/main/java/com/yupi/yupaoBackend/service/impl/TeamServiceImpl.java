@@ -9,6 +9,7 @@ import com.yupi.yupaoBackend.exception.BusinessException;
 import com.yupi.yupaoBackend.model.domain.Team;
 import com.yupi.yupaoBackend.model.domain.User;
 import com.yupi.yupaoBackend.model.domain.UserTeam;
+import com.yupi.yupaoBackend.model.dto.TeamMemberGetDTO;
 import com.yupi.yupaoBackend.model.dto.TeamQuery;
 import com.yupi.yupaoBackend.model.request.TeamJoinRequest;
 import com.yupi.yupaoBackend.model.request.TeamQuitRequest;
@@ -34,6 +35,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
 * @author 14700
@@ -68,7 +70,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         //2. 是否登录，未登录不允许创建
         if (loginUser == null){
-            throw new BusinessException(ErrorCode.NO_LOGIN,"未登录不允许创建");
+            throw new BusinessException(ErrorCode.NO_LOGIN,"未登录不允许th创建");
         }
         final long loginUserId = loginUser.getId();
         //3. 校验信息
@@ -174,14 +176,18 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             //根据状态来查询
             Integer status = teamQuery.getStatus();
             TeamStatusEnum statusEnum = TeamStatusEnum.getEnumByValue(status);
-            if (statusEnum == null){
-                statusEnum = TeamStatusEnum.PUBLIC;
-            }
+            // todo
+//            if (statusEnum == null){
+//                statusEnum = TeamStatusEnum.PUBLIC;
+//            }
             //只有管理员才能查看加密还有非公开的房间
-            if (!isAdmin && statusEnum.equals(TeamStatusEnum.PRIVATE)){
-                throw new BusinessException(ErrorCode.NO_AUTH, "没有权限");
+//            if (isAdmin && statusEnum.equals(TeamStatusEnum.PRIVATE)){
+//                throw new BusinessException(ErrorCode.NO_AUTH, "没有权限");
+//            }
+            if (statusEnum != null){
+                queryWrapper.eq(Team::getStatus, statusEnum.getStatus());
             }
-            queryWrapper.eq(Team::getStatus, statusEnum.getStatus());
+
 
         }
         //不展示已过期的队伍（根据过期时间筛选）
@@ -269,9 +275,9 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         Integer status = team.getStatus();
         TeamStatusEnum teamStatusEnum = TeamStatusEnum.getEnumByValue(status);
-        if (TeamStatusEnum.PRIVATE.equals(teamStatusEnum)){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "禁止加入私有队伍");
-        }
+//        if (TeamStatusEnum.PRIVATE.equals(teamStatusEnum)){
+//            throw new BusinessException(ErrorCode.PARAMS_ERROR, "禁止加入私有队伍");
+//        }
         String password = teamJoinRequest.getPassword();
         if (TeamStatusEnum.SECRET.equals(teamStatusEnum)){
             if (StringUtils.isBlank(password) || !password.equals(team.getPassword())){
@@ -412,6 +418,35 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         // 4. 删除队伍
         return  removeById(teamId);
 
+    }
+
+    /**
+     * 获取队伍
+     *
+     * @param teamMemberGetRequest
+     * @return
+     */
+    @Override
+    public List<User> memberList(TeamMemberGetDTO teamMemberGetRequest) {
+        // 获取队伍成员信息
+        LambdaQueryWrapper<UserTeam> teamMemberQueryWrapper = new LambdaQueryWrapper<>();
+        teamMemberQueryWrapper.eq(UserTeam::getTeamId, teamMemberGetRequest.getTeamId())
+                .select(UserTeam::getUserId);
+
+        List<UserTeam> userList = userTeamService.list(teamMemberQueryWrapper);
+
+        //检测队伍成员数量是否合法
+        if (userList == null || teamMemberGetRequest.getMaxNum() < userList.size()){
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "队伍成员数量不合法");
+        }
+
+        List<Long> userIdList= userList.stream().map(userId -> userId.getUserId()).collect(Collectors.toList());
+
+
+        //最终获得的成员列表
+        LambdaQueryWrapper<User> userQueryWrapper = new LambdaQueryWrapper<>();
+        List<User> memberList = userService.list(userQueryWrapper.in(User::getId, userIdList));
+        return memberList;
     }
 
     /**

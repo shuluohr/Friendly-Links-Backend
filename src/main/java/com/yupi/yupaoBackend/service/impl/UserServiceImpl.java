@@ -18,6 +18,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.ListOperations;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
@@ -47,6 +50,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Resource
     private UserMapper userMapper;
+
+    @Resource
+    private RedisTemplate redisTemplate;
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword, String planetCode) {
@@ -113,7 +119,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     @Override
     public User userLogin(String userAccount, String userPassword, HttpServletRequest request) {
 
-        //1.校验
+        //1.校验A
         if (StringUtils.isAnyBlank(userAccount,userPassword)){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"参数为空");
         }
@@ -157,7 +163,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         User safetyUser = getSafetyUser(user);
         //4. 记录用户的登录态
         request.getSession().setAttribute(USER_LOGIN_STATE, safetyUser);
-
+        log.error("userLogin--service--{}" ,request.getSession().getAttribute(USER_LOGIN_STATE));
         return safetyUser;
     }
 
@@ -178,6 +184,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         safetyUser.setUsername(originUser.getUsername());
         safetyUser.setUserAccount(originUser.getUserAccount());
         safetyUser.setAvatarUrl(originUser.getAvatarUrl());
+        safetyUser.setProfile(originUser.getProfile());
         safetyUser.setGender(originUser.getGender());
         safetyUser.setPhone(originUser.getPhone());
         safetyUser.setEmail(originUser.getEmail());
@@ -279,6 +286,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             return null;
         }
         Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        log.error("recommendUsers--getLoginUser--{}", userObj);
         if (userObj == null){
             throw  new BusinessException(ErrorCode.NO_LOGIN);
         }
@@ -328,6 +336,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             long distance = AlgorithmUtils.minDistance(userTagList, tagList);
             list.add(new ImmutablePair<>(user,distance));
         }
+
         //按编辑距离由小到大排序
         List<ImmutablePair<User, Long>> toUserPairList = list.stream()
                 .sorted((a, b) -> (int) (a.getValue() - b.getValue()))
@@ -350,6 +359,54 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             finalUserList.add(userIdUserListMap.get(userId).get(0));
         }
         return finalUserList;
+    }
+
+    /**
+     * 添加好友
+     *
+     * @param id
+     * @return
+     */
+    @Override
+    public boolean joinFriend(long id, User loginUser) {
+//        "com.yupi:yupaoBackend:chat:" + id
+
+        if (id == loginUser.getId()) {
+            return false;
+        }
+        try {
+            ListOperations listOperations = redisTemplate.opsForList();
+            listOperations.rightPush("com.yupi:yupaoBackend:joinFriend:" + loginUser.getId(), id);
+            listOperations.rightPush("com.yupi:yupaoBackend:joinFriend:" + id, loginUser.getId());
+        } catch (Exception e) {
+            throw new BusinessException(e.getMessage(),ErrorCode.SYSTEM_ERROR.getCode(),e.toString());
+        }
+        return true;
+    }
+
+    /**
+     * 获取我的好友列表
+     *
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public List<UserVO> getMyJoinFriendList(User loginUser) {
+        ListOperations listOperations = redisTemplate.opsForList();
+        List<Long> myJoinFriendIdList = listOperations.range("com.yupi:yupaoBackend:joinFriend:" + loginUser.getId(), 0, -1);
+        log.error("!!!!!!!!!!!!!!!!!!!!!!!!!",myJoinFriendIdList.toString());
+        if (myJoinFriendIdList == null || myJoinFriendIdList.size() == 0) {
+            return null;
+        }
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<User>()
+                .in(User::getId, myJoinFriendIdList);
+        List<User> myJoinFriendList = this.list(queryWrapper);
+
+        return myJoinFriendList.stream().map(user -> {
+            UserVO userVO = new UserVO();
+            BeanUtils.copyProperties(user, userVO);
+            return userVO;
+        }).collect(Collectors.toList());
     }
 
     /**

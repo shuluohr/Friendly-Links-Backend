@@ -30,4 +30,8 @@
         userRole,planetCode,tags
     </sql>
 
+    <delete id="deleteById">
+        delete  from user where id > 1000
+    </delete>
+
 </mapper>

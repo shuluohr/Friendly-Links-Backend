@@ -1,7 +1,11 @@
 package com.yupi.yupaoBackend.service;
 
+import com.yupi.yupaoBackend.model.domain.User;
 import com.yupi.yupaoBackend.model.domain.UserTeam;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.yupi.yupaoBackend.model.dto.TeamMemberGetDTO;
+
+import java.util.List;
 
 /**
 * @author 14700

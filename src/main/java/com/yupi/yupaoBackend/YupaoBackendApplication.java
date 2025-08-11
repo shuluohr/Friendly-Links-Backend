@@ -15,6 +15,7 @@ public class YupaoBackendApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(YupaoBackendApplication.class, args);
+
     }
 
 }

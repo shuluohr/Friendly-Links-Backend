@@ -20,13 +20,13 @@ spring:
       database: 1
 
 server:
-  port: 8080
+  port: 8091
   servlet:
     context-path: /api
     #session失效时间
     session:
       cookie:
-        domain: localhost
+        domain:
       timeout: 86400
 mybatis-plus:
   configuration:
